@@ -3,7 +3,7 @@ import { showToast } from "./components/ui-lib";
 import Locale from "./locales";
 import { RequestMessage } from "./client/api";
 import { ServiceProvider, REQUEST_TIMEOUT_MS } from "./constant";
-import { fetch as tauriFetch, ResponseType } from "@tauri-apps/api/http";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
 export function trimTopic(topic: string) {
   // Fix an issue where double quotes still show in the Indonesian language
@@ -289,22 +289,19 @@ export function showPlugins(provider: ServiceProvider, model: string) {
 
 export function fetch(
   url: string,
-  options?: Record<string, unknown>,
+  options?: RequestInit & {
+    data?: BodyInit;
+    timeout?: number;
+  },
 ): Promise<any> {
   if (window.__TAURI__) {
     const payload = options?.body || options?.data;
     return tauriFetch(url, {
       ...options,
-      body:
-        payload &&
-        ({
-          type: "Text",
-          payload,
-        } as any),
-      timeout: ((options?.timeout as number) || REQUEST_TIMEOUT_MS) / 1000,
-      responseType:
-        options?.responseType == "text" ? ResponseType.Text : ResponseType.JSON,
-    } as any);
+      body: payload,
+      connectTimeout:
+        ((options?.timeout as number) || REQUEST_TIMEOUT_MS) / 1000,
+    });
   }
   return window.fetch(url, options);
 }
@@ -315,7 +312,7 @@ export function adapter(config: Record<string, unknown>) {
   const fetchUrl = params
     ? `${path}?${new URLSearchParams(params as any).toString()}`
     : path;
-  return fetch(fetchUrl as string, { ...rest, responseType: "text" });
+  return fetch(fetchUrl as string, { ...rest });
 }
 
 export function safeLocalStorage(): {
