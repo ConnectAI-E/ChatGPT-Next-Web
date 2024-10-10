@@ -100,6 +100,16 @@ if (mode !== "export") {
       beforeFiles: ret,
     };
   };
+
+  nextConfig.redirects = async () => {
+    return [
+      {
+        source: '/404',
+        destination: '/#/chat',
+        permanent: false, // 使用临时重定向
+      },
+    ];
+  };
 }
 
 export default nextConfig;
