@@ -45,6 +45,14 @@
 .chat-input-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px;
+
+  &-end {
+    display: flex;
+    margin-left: auto;
+    gap: 5px;
+  }
 
   .chat-input-action {
     display: inline-flex;
@@ -61,10 +69,6 @@
     height: 16px;
     width: var(--icon-width);
     overflow: hidden;
-
-    &:not(:last-child) {
-      margin-right: 5px;
-    }
 
     .text {
       white-space: nowrap;
@@ -711,16 +715,21 @@
     display: flex;
     flex-direction: column;
     flex: 1;
-    border-right: var(--border-in-light);
   }
   .chat-side-panel {
-    padding: 20px;
     box-sizing: border-box;
-    width: 300px;
     position: relative;
     height: 100%;
+    border-left: var(--border-in-light);
+    overflow: hidden;
+    transition: width 0.3s ease;
+    width: 0;
+    &-show {
+      width: 300px;
+    }
+
     &.mobile {
-      display: none;
+      width: 0;
     }
   }
 }

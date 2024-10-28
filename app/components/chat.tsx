@@ -46,6 +46,7 @@ import StyleIcon from "../icons/palette.svg";
 import PluginIcon from "../icons/plugin.svg";
 import ShortcutkeyIcon from "../icons/shortcutkey.svg";
 import ReloadIcon from "../icons/reload.svg";
+import HeadphoneIcon from "../icons/headphone.svg";
 
 import {
   ChatMessage,
@@ -457,6 +458,7 @@ export function ChatActions(props: {
   uploading: boolean;
   setShowShortcutKeyModal: React.Dispatch<React.SetStateAction<boolean>>;
   setUserInput: (input: string) => void;
+  setShowChatSidePanel: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const config = useAppConfig();
   const navigate = useNavigate();
@@ -553,238 +555,248 @@ export function ChatActions(props: {
 
   return (
     <div className={styles["chat-input-actions"]}>
-      {couldStop && (
+      <>
+        {couldStop && (
+          <ChatAction
+            onClick={stopAll}
+            text={Locale.Chat.InputActions.Stop}
+            icon={<StopIcon />}
+          />
+        )}
+        {!props.hitBottom && (
+          <ChatAction
+            onClick={props.scrollToBottom}
+            text={Locale.Chat.InputActions.ToBottom}
+            icon={<BottomIcon />}
+          />
+        )}
+        {props.hitBottom && (
+          <ChatAction
+            onClick={props.showPromptModal}
+            text={Locale.Chat.InputActions.Settings}
+            icon={<SettingsIcon />}
+          />
+        )}
+
+        {showUploadImage && (
+          <ChatAction
+            onClick={props.uploadImage}
+            text={Locale.Chat.InputActions.UploadImage}
+            icon={props.uploading ? <LoadingButtonIcon /> : <ImageIcon />}
+          />
+        )}
         <ChatAction
-          onClick={stopAll}
-          text={Locale.Chat.InputActions.Stop}
-          icon={<StopIcon />}
+          onClick={nextTheme}
+          text={Locale.Chat.InputActions.Theme[theme]}
+          icon={
+            <>
+              {theme === Theme.Auto ? (
+                <AutoIcon />
+              ) : theme === Theme.Light ? (
+                <LightIcon />
+              ) : theme === Theme.Dark ? (
+                <DarkIcon />
+              ) : null}
+            </>
+          }
         />
-      )}
-      {!props.hitBottom && (
+
         <ChatAction
-          onClick={props.scrollToBottom}
-          text={Locale.Chat.InputActions.ToBottom}
-          icon={<BottomIcon />}
+          onClick={props.showPromptHints}
+          text={Locale.Chat.InputActions.Prompt}
+          icon={<PromptIcon />}
         />
-      )}
-      {props.hitBottom && (
-        <ChatAction
-          onClick={props.showPromptModal}
-          text={Locale.Chat.InputActions.Settings}
-          icon={<SettingsIcon />}
-        />
-      )}
 
-      {showUploadImage && (
-        <ChatAction
-          onClick={props.uploadImage}
-          text={Locale.Chat.InputActions.UploadImage}
-          icon={props.uploading ? <LoadingButtonIcon /> : <ImageIcon />}
-        />
-      )}
-      <ChatAction
-        onClick={nextTheme}
-        text={Locale.Chat.InputActions.Theme[theme]}
-        icon={
-          <>
-            {theme === Theme.Auto ? (
-              <AutoIcon />
-            ) : theme === Theme.Light ? (
-              <LightIcon />
-            ) : theme === Theme.Dark ? (
-              <DarkIcon />
-            ) : null}
-          </>
-        }
-      />
-
-      <ChatAction
-        onClick={props.showPromptHints}
-        text={Locale.Chat.InputActions.Prompt}
-        icon={<PromptIcon />}
-      />
-
-      <ChatAction
-        onClick={() => {
-          navigate(Path.Masks);
-        }}
-        text={Locale.Chat.InputActions.Masks}
-        icon={<MaskIcon />}
-      />
-
-      <ChatAction
-        text={Locale.Chat.InputActions.Clear}
-        icon={<BreakIcon />}
-        onClick={() => {
-          chatStore.updateCurrentSession((session) => {
-            if (session.clearContextIndex === session.messages.length) {
-              session.clearContextIndex = undefined;
-            } else {
-              session.clearContextIndex = session.messages.length;
-              session.memoryPrompt = ""; // will clear memory
-            }
-          });
-        }}
-      />
-
-      <ChatAction
-        onClick={() => setShowModelSelector(true)}
-        text={currentModelName}
-        icon={<RobotIcon />}
-      />
-
-      {showModelSelector && (
-        <Selector
-          defaultSelectedValue={`${currentModel}@${currentProviderName}`}
-          items={models.map((m) => ({
-            title: `${m.displayName}${
-              m?.provider?.providerName
-                ? " (" + m?.provider?.providerName + ")"
-                : ""
-            }`,
-            value: `${m.name}@${m?.provider?.providerName}`,
-          }))}
-          onClose={() => setShowModelSelector(false)}
-          onSelection={(s) => {
-            if (s.length === 0) return;
-            const [model, providerName] = s[0].split("@");
-            chatStore.updateCurrentSession((session) => {
-              session.mask.modelConfig.model = model as ModelType;
-              session.mask.modelConfig.providerName =
-                providerName as ServiceProvider;
-              session.mask.syncGlobalConfig = false;
-            });
-            if (providerName == "ByteDance") {
-              const selectedModel = models.find(
-                (m) =>
-                  m.name == model && m?.provider?.providerName == providerName,
-              );
-              showToast(selectedModel?.displayName ?? "");
-            } else {
-              showToast(model);
-            }
-          }}
-        />
-      )}
-
-      {isDalle3(currentModel) && (
-        <ChatAction
-          onClick={() => setShowSizeSelector(true)}
-          text={currentSize}
-          icon={<SizeIcon />}
-        />
-      )}
-
-      {showSizeSelector && (
-        <Selector
-          defaultSelectedValue={currentSize}
-          items={dalle3Sizes.map((m) => ({
-            title: m,
-            value: m,
-          }))}
-          onClose={() => setShowSizeSelector(false)}
-          onSelection={(s) => {
-            if (s.length === 0) return;
-            const size = s[0];
-            chatStore.updateCurrentSession((session) => {
-              session.mask.modelConfig.size = size;
-            });
-            showToast(size);
-          }}
-        />
-      )}
-
-      {isDalle3(currentModel) && (
-        <ChatAction
-          onClick={() => setShowQualitySelector(true)}
-          text={currentQuality}
-          icon={<QualityIcon />}
-        />
-      )}
-
-      {showQualitySelector && (
-        <Selector
-          defaultSelectedValue={currentQuality}
-          items={dalle3Qualitys.map((m) => ({
-            title: m,
-            value: m,
-          }))}
-          onClose={() => setShowQualitySelector(false)}
-          onSelection={(q) => {
-            if (q.length === 0) return;
-            const quality = q[0];
-            chatStore.updateCurrentSession((session) => {
-              session.mask.modelConfig.quality = quality;
-            });
-            showToast(quality);
-          }}
-        />
-      )}
-
-      {isDalle3(currentModel) && (
-        <ChatAction
-          onClick={() => setShowStyleSelector(true)}
-          text={currentStyle}
-          icon={<StyleIcon />}
-        />
-      )}
-
-      {showStyleSelector && (
-        <Selector
-          defaultSelectedValue={currentStyle}
-          items={dalle3Styles.map((m) => ({
-            title: m,
-            value: m,
-          }))}
-          onClose={() => setShowStyleSelector(false)}
-          onSelection={(s) => {
-            if (s.length === 0) return;
-            const style = s[0];
-            chatStore.updateCurrentSession((session) => {
-              session.mask.modelConfig.style = style;
-            });
-            showToast(style);
-          }}
-        />
-      )}
-
-      {showPlugins(currentProviderName, currentModel) && (
         <ChatAction
           onClick={() => {
-            if (pluginStore.getAll().length == 0) {
-              navigate(Path.Plugins);
-            } else {
-              setShowPluginSelector(true);
-            }
+            navigate(Path.Masks);
           }}
-          text={Locale.Plugin.Name}
-          icon={<PluginIcon />}
+          text={Locale.Chat.InputActions.Masks}
+          icon={<MaskIcon />}
         />
-      )}
-      {showPluginSelector && (
-        <Selector
-          multiple
-          defaultSelectedValue={chatStore.currentSession().mask?.plugin}
-          items={pluginStore.getAll().map((item) => ({
-            title: `${item?.title}@${item?.version}`,
-            value: item?.id,
-          }))}
-          onClose={() => setShowPluginSelector(false)}
-          onSelection={(s) => {
+
+        <ChatAction
+          text={Locale.Chat.InputActions.Clear}
+          icon={<BreakIcon />}
+          onClick={() => {
             chatStore.updateCurrentSession((session) => {
-              session.mask.plugin = s as string[];
+              if (session.clearContextIndex === session.messages.length) {
+                session.clearContextIndex = undefined;
+              } else {
+                session.clearContextIndex = session.messages.length;
+                session.memoryPrompt = ""; // will clear memory
+              }
             });
           }}
         />
-      )}
 
-      {!isMobileScreen && (
         <ChatAction
-          onClick={() => props.setShowShortcutKeyModal(true)}
-          text={Locale.Chat.ShortcutKey.Title}
-          icon={<ShortcutkeyIcon />}
+          onClick={() => setShowModelSelector(true)}
+          text={currentModelName}
+          icon={<RobotIcon />}
         />
-      )}
+
+        {showModelSelector && (
+          <Selector
+            defaultSelectedValue={`${currentModel}@${currentProviderName}`}
+            items={models.map((m) => ({
+              title: `${m.displayName}${
+                m?.provider?.providerName
+                  ? " (" + m?.provider?.providerName + ")"
+                  : ""
+              }`,
+              value: `${m.name}@${m?.provider?.providerName}`,
+            }))}
+            onClose={() => setShowModelSelector(false)}
+            onSelection={(s) => {
+              if (s.length === 0) return;
+              const [model, providerName] = s[0].split("@");
+              chatStore.updateCurrentSession((session) => {
+                session.mask.modelConfig.model = model as ModelType;
+                session.mask.modelConfig.providerName =
+                  providerName as ServiceProvider;
+                session.mask.syncGlobalConfig = false;
+              });
+              if (providerName == "ByteDance") {
+                const selectedModel = models.find(
+                  (m) =>
+                    m.name == model &&
+                    m?.provider?.providerName == providerName,
+                );
+                showToast(selectedModel?.displayName ?? "");
+              } else {
+                showToast(model);
+              }
+            }}
+          />
+        )}
+
+        {isDalle3(currentModel) && (
+          <ChatAction
+            onClick={() => setShowSizeSelector(true)}
+            text={currentSize}
+            icon={<SizeIcon />}
+          />
+        )}
+
+        {showSizeSelector && (
+          <Selector
+            defaultSelectedValue={currentSize}
+            items={dalle3Sizes.map((m) => ({
+              title: m,
+              value: m,
+            }))}
+            onClose={() => setShowSizeSelector(false)}
+            onSelection={(s) => {
+              if (s.length === 0) return;
+              const size = s[0];
+              chatStore.updateCurrentSession((session) => {
+                session.mask.modelConfig.size = size;
+              });
+              showToast(size);
+            }}
+          />
+        )}
+
+        {isDalle3(currentModel) && (
+          <ChatAction
+            onClick={() => setShowQualitySelector(true)}
+            text={currentQuality}
+            icon={<QualityIcon />}
+          />
+        )}
+
+        {showQualitySelector && (
+          <Selector
+            defaultSelectedValue={currentQuality}
+            items={dalle3Qualitys.map((m) => ({
+              title: m,
+              value: m,
+            }))}
+            onClose={() => setShowQualitySelector(false)}
+            onSelection={(q) => {
+              if (q.length === 0) return;
+              const quality = q[0];
+              chatStore.updateCurrentSession((session) => {
+                session.mask.modelConfig.quality = quality;
+              });
+              showToast(quality);
+            }}
+          />
+        )}
+
+        {isDalle3(currentModel) && (
+          <ChatAction
+            onClick={() => setShowStyleSelector(true)}
+            text={currentStyle}
+            icon={<StyleIcon />}
+          />
+        )}
+
+        {showStyleSelector && (
+          <Selector
+            defaultSelectedValue={currentStyle}
+            items={dalle3Styles.map((m) => ({
+              title: m,
+              value: m,
+            }))}
+            onClose={() => setShowStyleSelector(false)}
+            onSelection={(s) => {
+              if (s.length === 0) return;
+              const style = s[0];
+              chatStore.updateCurrentSession((session) => {
+                session.mask.modelConfig.style = style;
+              });
+              showToast(style);
+            }}
+          />
+        )}
+
+        {showPlugins(currentProviderName, currentModel) && (
+          <ChatAction
+            onClick={() => {
+              if (pluginStore.getAll().length == 0) {
+                navigate(Path.Plugins);
+              } else {
+                setShowPluginSelector(true);
+              }
+            }}
+            text={Locale.Plugin.Name}
+            icon={<PluginIcon />}
+          />
+        )}
+        {showPluginSelector && (
+          <Selector
+            multiple
+            defaultSelectedValue={chatStore.currentSession().mask?.plugin}
+            items={pluginStore.getAll().map((item) => ({
+              title: `${item?.title}@${item?.version}`,
+              value: item?.id,
+            }))}
+            onClose={() => setShowPluginSelector(false)}
+            onSelection={(s) => {
+              chatStore.updateCurrentSession((session) => {
+                session.mask.plugin = s as string[];
+              });
+            }}
+          />
+        )}
+
+        {!isMobileScreen && (
+          <ChatAction
+            onClick={() => props.setShowShortcutKeyModal(true)}
+            text={Locale.Chat.ShortcutKey.Title}
+            icon={<ShortcutkeyIcon />}
+          />
+        )}
+      </>
+      <div className={styles["chat-input-actions-end"]}>
+        <ChatAction
+          onClick={() => props.setShowChatSidePanel(true)}
+          text={"Realtime Chat"}
+          icon={<HeadphoneIcon />}
+        />
+      </div>
     </div>
   );
 }
@@ -1574,6 +1586,8 @@ function _Chat() {
     };
   }, [messages, chatStore, navigate]);
 
+  const [showChatSidePanel, setShowChatSidePanel] = useState(false);
+
   return (
     <>
       <div className={styles.chat} key={session.id}>
@@ -1936,6 +1950,7 @@ function _Chat() {
                 }}
                 setShowShortcutKeyModal={setShowShortcutKeyModal}
                 setUserInput={setUserInput}
+                setShowChatSidePanel={setShowChatSidePanel}
               />
               <label
                 className={`${styles["chat-input-panel-inner"]} ${
@@ -1999,20 +2014,13 @@ function _Chat() {
           <div
             className={`${styles["chat-side-panel"]} ${
               isMobileScreen ? styles["mobile"] : ""
-            }`}
+            } ${showChatSidePanel ? styles["chat-side-panel-show"] : ""}`}
           >
-            <RealtimeChat />
-            {/* <div className={styles["circle-mic"]}>
-              <div className={styles["icon-center"]}></div>
-            </div>
-            <div className={styles["bottom-icons"]}>
-              <div className={styles["icon-left"]}>
-                <VoiceIcon />
-              </div>
-              <div className={styles["icon-right"]}>
-                <Close24Icon />
-              </div>
-            </div> */}
+            <RealtimeChat
+              onClose={() => {
+                setShowChatSidePanel(false);
+              }}
+            />
           </div>
         </div>
       </div>
