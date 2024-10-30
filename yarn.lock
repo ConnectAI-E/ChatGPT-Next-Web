@@ -6648,6 +6648,11 @@ nanoid@^5.0.3:
   resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-5.0.3.tgz#6c97f53d793a7a1de6a38ebb46f50f95bf9793c7"
   integrity sha512-I7X2b22cxA4LIHXPSqbBCEQSL+1wv8TuoefejsX4HFWyC6jc5JG7CEaxOltiKjc1M+YCS2YkrZZcj4+dytw9GA==
 
+nanoid@^5.0.7:
+  version "5.0.8"
+  resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-5.0.8.tgz#7610003f6b3b761b5c244bb342c112c5312512bf"
+  integrity sha512-TcJPw+9RV9dibz1hHUzlLVy8N4X9TnwirAjrU08Juo6BNKggzVfP2ZJ/3ZUSq15Xl5i85i+Z89XBO90pB2PghQ==
+
 natural-compare@^1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
@@ -6839,6 +6844,14 @@ onetime@^6.0.0:
   integrity sha512-1FlR+gjXK7X+AsAHso35MnyN5KqGwJRi/31ft6x0M194ht7S+rWAvd7PHss9xSKMzE0asv1pyIHaJYq+BbacAQ==
   dependencies:
     mimic-fn "^4.0.0"
+
+openai-realtime-api@^1.0.6:
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/openai-realtime-api/-/openai-realtime-api-1.0.6.tgz#d5a0db3c4b3ac696f144fbf48e43c9fc9842eabc"
+  integrity sha512-3WLYsbFZrsLXe4wRZtC1j5GdMi1XhnyZBUBGBFAM6XCzsqFiClphPY7IGBgCRo5rvt5iDuEB5Ui6gywNUAH05w==
+  dependencies:
+    nanoid "^5.0.7"
+    ws "^8.18.0"
 
 openapi-client-axios@^7.5.5:
   version "7.5.5"
@@ -8451,7 +8464,7 @@ write-file-atomic@^4.0.2:
     imurmurhash "^0.1.4"
     signal-exit "^3.0.7"
 
-ws@^8.11.0:
+ws@^8.11.0, ws@^8.18.0:
   version "8.18.0"
   resolved "https://registry.npmmirror.com/ws/-/ws-8.18.0.tgz#0d7505a6eafe2b0e712d232b42279f53bc289bbc"
   integrity sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw==

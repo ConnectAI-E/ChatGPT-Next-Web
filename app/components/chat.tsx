@@ -124,6 +124,8 @@ import { isEmpty } from "lodash-es";
 
 import { RealtimeChat } from "@/app/components/realtime-chat";
 
+import { Audio } from "@/app/client/audio";
+
 const localStorage = safeLocalStorage();
 
 const ttsPlayer = createTTSPlayer();
@@ -1588,6 +1590,8 @@ function _Chat() {
 
   const [showChatSidePanel, setShowChatSidePanel] = useState(false);
 
+  useEffect(() => {}, []);
+
   return (
     <>
       <div className={styles.chat} key={session.id}>
@@ -2019,6 +2023,14 @@ function _Chat() {
             <RealtimeChat
               onClose={() => {
                 setShowChatSidePanel(false);
+              }}
+              onStartVoice={async () => {
+                console.log("start voice");
+                const audio = new Audio();
+                await audio.connect();
+                await audio.startRecording((data) => {
+                  console.log(data);
+                });
               }}
             />
           </div>
