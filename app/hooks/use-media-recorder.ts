@@ -19,20 +19,20 @@ export type RecordProp = {
 
 export const useMediaRecorder = (options: {
   onRecord?: (data: RecordProp) => void;
-  onData?: (data: RecordProp) => void;
+  onStop?: (data: RecordProp) => void;
   audioBitsPerSecond?: number;
   mimeType?: string;
 }) => {
   const {
     onRecord,
-    onData,
+    onStop,
     audioBitsPerSecond = 128000,
     mimeType = "audio/webm;codecs=pcm",
   } = options;
 
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
-  const chunks = useRef<Uint8Array[]>([]);
+  const chunks = useRef<Blob[]>([]);
   const [error, setError] = useState<Error | null>(null);
 
   const pause = useCallback(() => {
@@ -57,9 +57,6 @@ export const useMediaRecorder = (options: {
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
     }
-    const blob = new Blob(chunks.current);
-    const url = URL.createObjectURL(blob);
-    onData?.({ blob, url });
   }, []);
 
   const start = useCallback(() => {
@@ -76,12 +73,18 @@ export const useMediaRecorder = (options: {
 
         recorder.ondataavailable = (event) => {
           const blob = event.data;
+          chunks.current?.push(blob); // store chunks
           blob.arrayBuffer().then((buffer) => {
             const bytes = new Uint8Array(buffer);
-            chunks.current?.push(bytes); // store chunks
             const base64 = base64EncodeAudio(bytes);
             onRecord?.({ blob, base64 });
           });
+        };
+
+        recorder.onstop = () => {
+          const blob = new Blob(chunks.current, { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          onStop?.({ blob, url });
         };
 
         recorder.onerror = (event) => {
