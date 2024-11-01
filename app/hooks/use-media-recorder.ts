@@ -1,91 +1,57 @@
-import { useCallback, useState } from "react";
-import { getRecordMimeType } from "@/app/utils/ger-recorder-mime-type";
+import { useCallback, useState, useRef } from "react";
 
 export const useMediaRecorder = (options: {
-  onBlobAvailable?: (blob: Blob) => void;
+  onRecord?: (blob: Blob) => void;
+  audioBitsPerSecond?: number;
+  mimeType?: string;
 }) => {
-  const { onBlobAvailable } = options;
-  const [isRecording, setIsRecording] = useState(false);
+  const {
+    onRecord,
+    audioBitsPerSecond = 128000,
+    mimeType = "audio/webm;codecs=pcm",
+  } = options;
+
+  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const timerInterval = useRef<NodeJS.Timeout | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [time, setTime] = useState(0);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null,
-  );
-  const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(
-    null,
-  );
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [isPaused, setIsPaused] = useState(false);
-
-  const clearResources = useCallback(() => {
-    if (url) {
-      URL.revokeObjectURL(url);
-      setUrl(null);
-    }
-    setBlob(null);
-    setError(null);
-  }, [url]);
-
-  const _startTimer = useCallback(() => {
-    const interval = setInterval(() => {
-      setTime((prevTime) => prevTime + 1);
-    }, 1000);
-    setTimerInterval(interval);
-  }, []);
-
-  const _stopTimer = useCallback(() => {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      setTimerInterval(null);
-    }
-  }, [timerInterval]);
 
   const pause = useCallback(() => {
-    if (!mediaRecorder || !isRecording || isPaused) return;
-
-    mediaRecorder.pause();
-    setIsPaused(true);
-    _stopTimer();
-  }, [mediaRecorder, isRecording, isPaused, _stopTimer]);
+    if (mediaRecorder.current && mediaRecorder.current?.state === "recording") {
+      mediaRecorder.current?.pause();
+    }
+  }, []);
 
   const resume = useCallback(() => {
-    if (!mediaRecorder || !isRecording || !isPaused) return;
-
-    mediaRecorder.resume();
-    setIsPaused(false);
-    _startTimer();
-  }, [mediaRecorder, isRecording, isPaused, _startTimer]);
+    if (mediaRecorder.current && mediaRecorder.current?.state === "paused") {
+      mediaRecorder.current?.resume();
+    }
+  }, []);
 
   const stop = useCallback(() => {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
+    if (mediaRecorder.current) {
+      if (mediaRecorder.current?.state !== "inactive") {
+        mediaRecorder.current?.stop();
+      }
+      mediaRecorder.current = null;
     }
-    _stopTimer();
-    setTime(0);
-    setIsRecording(false);
-    setIsPaused(false);
-  }, [mediaRecorder, _stopTimer]);
+    if (timerInterval.current) {
+      clearInterval(timerInterval.current);
+    }
+  }, []);
 
   const start = useCallback(() => {
-    if (isRecording) return;
-    clearResources();
+    if (mediaRecorder.current && mediaRecorder.current?.state !== "inactive")
+      return;
 
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
-        const recorder = new MediaRecorder(stream, {
-          mimeType: getRecordMimeType().mimeType,
-        });
+        const recorder = (mediaRecorder.current = new MediaRecorder(stream, {
+          mimeType,
+          audioBitsPerSecond,
+        }));
 
-        recorder.ondataavailable = (event) => {
-          const blobData = event.data;
-          setBlob(blobData);
-          setUrl(URL.createObjectURL(blobData));
-          onBlobAvailable?.(blobData);
-          recorder.stream.getTracks().forEach((track) => track.stop());
-          setMediaRecorder(null);
-        };
+        recorder.ondataavailable = (event) => onRecord?.(event.data);
 
         recorder.onerror = (event) => {
           // @ts-ignore
@@ -93,28 +59,47 @@ export const useMediaRecorder = (options: {
           stop();
         };
 
-        setMediaRecorder(recorder);
-        setIsRecording(true);
         recorder.start();
-        _startTimer();
+        // 128000 / 20 = 6400
+        timerInterval.current = setInterval(() => {
+          // https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/requestData
+          // when call `requestData()`, Raise a dataavailable event with blob(captured data), and create new blob.
+          if (
+            mediaRecorder.current &&
+            mediaRecorder.current?.state === "recording"
+          ) {
+            mediaRecorder.current.requestData();
+          }
+        }, 50);
       })
       .catch((error) => {
         setError(error);
         console.error("Error useAudioRecorder:", error);
       });
-  }, [isRecording, clearResources, _startTimer, onBlobAvailable, stop]);
+  }, [onBlobAvailable, stop]);
 
-  return {
-    blob,
+  const state = {
     error,
-    isRecording,
-    isPaused,
     mediaRecorder,
     start,
     stop,
     pause,
     resume,
-    time,
-    url,
   };
+  // return isPaused/isRecording as property
+  Object.defineProperties(state, {
+    isPaused: {
+      get() {
+        return mediaRecorder.current?.state === "paused";
+      },
+    },
+    isRecording: {
+      get() {
+        return (
+          mediaRecorder.current && mediaRecorder.current?.state !== "inactive"
+        );
+      },
+    },
+  });
+  return state;
 };
