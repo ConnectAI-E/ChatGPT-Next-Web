@@ -1,30 +1,38 @@
 import { useCallback, useState, useRef } from "react";
 
 // https://platform.openai.com/docs/guides/realtime?text-generation-quickstart-example=stream
-function base64EncodeAudio(blob) {
+function base64EncodeAudio(bytes: Uint8Array) {
   let binary = "";
-  let bytes = new Uint8Array(blob.arrayBuffer());
   const chunkSize = 0x8000; // 32KB chunk size
   for (let i = 0; i < bytes.length; i += chunkSize) {
     let chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, chunk);
+    binary += String.fromCharCode.apply(null, chunk as any);
   }
   return btoa(binary);
 }
 
+export type RecordProp = {
+  blob: Blob;
+  base64?: string;
+  url?: string;
+};
+
 export const useMediaRecorder = (options: {
-  onRecord?: (blob: Blob) => void;
+  onRecord?: (data: RecordProp) => void;
+  onData?: (data: RecordProp) => void;
   audioBitsPerSecond?: number;
   mimeType?: string;
 }) => {
   const {
     onRecord,
+    onData,
     audioBitsPerSecond = 128000,
     mimeType = "audio/webm;codecs=pcm",
   } = options;
 
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
+  const chunks = useRef<Uint8Array[]>([]);
   const [error, setError] = useState<Error | null>(null);
 
   const pause = useCallback(() => {
@@ -49,6 +57,9 @@ export const useMediaRecorder = (options: {
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
     }
+    const blob = new Blob(chunks.current);
+    const url = URL.createObjectURL(blob);
+    onData?.({ blob, url });
   }, []);
 
   const start = useCallback(() => {
@@ -65,8 +76,12 @@ export const useMediaRecorder = (options: {
 
         recorder.ondataavailable = (event) => {
           const blob = event.data;
-          const base64 = base64EncodeAudio(blob);
-          onRecord?.({ blob, base64 });
+          blob.arrayBuffer().then((buffer) => {
+            const bytes = new Uint8Array(buffer);
+            chunks.current?.push(bytes); // store chunks
+            const base64 = base64EncodeAudio(bytes);
+            onRecord?.({ blob, base64 });
+          });
         };
 
         recorder.onerror = (event) => {
@@ -92,7 +107,7 @@ export const useMediaRecorder = (options: {
         setError(error);
         console.error("Error useAudioRecorder:", error);
       });
-  }, [onBlobAvailable, stop]);
+  }, [onRecord, stop]);
 
   return {
     error,
@@ -105,5 +120,4 @@ export const useMediaRecorder = (options: {
     pause,
     resume,
   };
-  return state;
 };
