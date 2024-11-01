@@ -78,28 +78,16 @@ export const useMediaRecorder = (options: {
       });
   }, [onBlobAvailable, stop]);
 
-  const state = {
+  return {
     error,
     mediaRecorder,
+    isPaused: () => mediaRecorder.current?.state === "paused",
+    isRecording: () =>
+      mediaRecorder.current && mediaRecorder.current?.state !== "inactive",
     start,
     stop,
     pause,
     resume,
   };
-  // return isPaused/isRecording as property
-  Object.defineProperties(state, {
-    isPaused: {
-      get() {
-        return mediaRecorder.current?.state === "paused";
-      },
-    },
-    isRecording: {
-      get() {
-        return (
-          mediaRecorder.current && mediaRecorder.current?.state !== "inactive"
-        );
-      },
-    },
-  });
   return state;
 };
