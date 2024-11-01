@@ -1,5 +1,17 @@
 import { useCallback, useState, useRef } from "react";
 
+// https://platform.openai.com/docs/guides/realtime?text-generation-quickstart-example=stream
+function base64EncodeAudio(blob) {
+  let binary = "";
+  let bytes = new Uint8Array(blob.arrayBuffer());
+  const chunkSize = 0x8000; // 32KB chunk size
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    let chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+
 export const useMediaRecorder = (options: {
   onRecord?: (blob: Blob) => void;
   audioBitsPerSecond?: number;
@@ -51,7 +63,11 @@ export const useMediaRecorder = (options: {
           audioBitsPerSecond,
         }));
 
-        recorder.ondataavailable = (event) => onRecord?.(event.data);
+        recorder.ondataavailable = (event) => {
+          const blob = event.data;
+          const base64 = base64EncodeAudio(blob);
+          onRecord?.({ blob, base64 });
+        };
 
         recorder.onerror = (event) => {
           // @ts-ignore
