@@ -2013,20 +2013,22 @@ function _Chat() {
               </label>
             </div>
           </div>
-          <div
-            className={`${styles["chat-side-panel"]} ${
-              isMobileScreen ? styles["mobile"] : ""
-            } ${showChatSidePanel ? styles["chat-side-panel-show"] : ""}`}
-          >
-            <RealtimeChat
-              onClose={() => {
-                setShowChatSidePanel(false);
-              }}
-              onStartVoice={async () => {
-                console.log("start voice");
-              }}
-            />
-          </div>
+          {showChatSidePanel && (
+            <div
+              className={`${styles["chat-side-panel"]} ${
+                isMobileScreen ? styles["mobile"] : ""
+              } ${styles["chat-side-panel-show"]}`}
+            >
+              <RealtimeChat
+                onClose={() => {
+                  setShowChatSidePanel(false);
+                }}
+                onStartVoice={async () => {
+                  console.log("start voice");
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
       {showExport && (

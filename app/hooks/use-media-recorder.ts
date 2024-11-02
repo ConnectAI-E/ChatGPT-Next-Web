@@ -1,25 +1,8 @@
 import { useCallback, useState, useRef } from "react";
 
-// https://platform.openai.com/docs/guides/realtime?text-generation-quickstart-example=stream
-function base64EncodeAudio(bytes: Uint8Array) {
-  let binary = "";
-  const chunkSize = 0x8000; // 32KB chunk size
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    let chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, chunk as any);
-  }
-  return btoa(binary);
-}
-
-export type RecordProp = {
-  blob: Blob;
-  base64?: string;
-  url?: string;
-};
-
 export const useMediaRecorder = (options: {
-  onRecord?: (data: RecordProp) => void;
-  onStop?: (data: RecordProp) => void;
+  onRecord?: (blob: Blob) => void;
+  onStop?: (blob: Blob) => void;
   audioBitsPerSecond?: number;
   mimeType?: string;
 }) => {
@@ -73,19 +56,14 @@ export const useMediaRecorder = (options: {
 
         recorder.ondataavailable = (event) => {
           const blob = event.data;
-          chunks.current?.push(blob); // store chunks
-          blob.arrayBuffer().then((buffer) => {
-            const bytes = new Uint8Array(buffer);
-            const base64 = base64EncodeAudio(bytes);
-            onRecord?.({ blob, base64 });
-          });
+          if (blob.size > 0) {
+            chunks.current?.push(blob); // store chunks
+            onRecord?.(blob);
+          }
         };
 
-        recorder.onstop = () => {
-          const blob = new Blob(chunks.current, { type: mimeType });
-          const url = URL.createObjectURL(blob);
-          onStop?.({ blob, url });
-        };
+        recorder.onstop = () =>
+          onStop?.(new Blob(chunks.current, { type: mimeType }));
 
         recorder.onerror = (event) => {
           // @ts-ignore
