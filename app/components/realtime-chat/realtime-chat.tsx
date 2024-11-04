@@ -148,15 +148,26 @@ export function RealtimeChat({
             }
           });
           client.on("conversation.updated", async (event: any) => {
-            console.log("currentSession", chatStore.currentSession());
-            const items = client.conversation.getItems();
-            console.log(
-              "conversation.updated",
-              event,
-              event?.item?.content?.[0]?.transcript,
-              event.item?.status,
-              items,
-            );
+            // console.log("currentSession", chatStore.currentSession());
+            // const items = client.conversation.getItems();
+            const content = event?.item?.content?.[0]?.transcript || "";
+            const text = event?.item?.content?.[0]?.text || "";
+            // console.log(
+            //   "conversation.updated",
+            //   event,
+            //   "content[0]",
+            //   event?.item?.content?.[0]?.transcript,
+            //   "formatted",
+            //   event?.item?.formatted?.transcript,
+            //   "content",
+            //   content,
+            //   "text",
+            //   text,
+            //   event?.item?.status,
+            //   event?.item?.role,
+            //   items.length,
+            //   items,
+            // );
             const { item, delta } = event;
             const { role, id, status, formatted } = item || {};
             if (id && role == "assistant") {
@@ -175,9 +186,8 @@ export function RealtimeChat({
               if (currentBotMessage.current?.id != id) {
                 stopPlaying();
               }
-              if (delta?.transcript) {
-                const { text, transcript } = formatted || {};
-                currentBotMessage.current.content = transcript;
+              if (content) {
+                currentBotMessage.current.content = content;
                 chatStore.updateCurrentSession((session) => {
                   session.messages = session.messages.concat();
                 });
@@ -187,18 +197,19 @@ export function RealtimeChat({
                 // 直接播放
                 addInt16PCM(delta.audio);
               }
-              console.log(
-                "updated try save wavFile",
-                status,
-                currentBotMessage.current?.audio_url,
-                formatted?.audio,
-              );
+              // console.log(
+              //   "updated try save wavFile",
+              //   status,
+              //   currentBotMessage.current?.audio_url,
+              //   formatted?.audio,
+              // );
               if (
                 status == "completed" &&
                 !currentBotMessage.current?.audio_url &&
-                formatted?.audio
+                formatted?.audio?.length
               ) {
                 // 转换为wav文件保存 TODO 使用mp3格式会更节省空间
+                const botMessage = currentBotMessage.current;
                 const wavFile = new WavPacker().pack(sampleRate, {
                   bitsPerSample: 16,
                   channelCount: 1,
@@ -207,32 +218,39 @@ export function RealtimeChat({
                 // 这里将音频文件放到对象里面wavFile.url可以使用<audio>标签播放
                 item.formatted.file = wavFile;
                 uploadImageRemote(wavFile.blob).then((audio_url) => {
-                  currentBotMessage.current.audio_url = audio_url;
+                  botMessage.audio_url = audio_url;
                   chatStore.updateCurrentSession((session) => {
                     session.messages = session.messages.concat();
                   });
                 });
               }
-            }
-            if (id && role == "user") {
               if (
-                delta?.transcript &&
-                (!currentUserMessage.current ||
-                  currentUserMessage.current?.id != id)
+                status == "completed" &&
+                !currentBotMessage.current?.content
+              ) {
+                chatStore.updateCurrentSession((session) => {
+                  session.messages = session.messages.filter(
+                    (m) => m.id !== currentBotMessage.current?.id,
+                  );
+                });
+              }
+            }
+            if (id && role == "user" && !text) {
+              if (
+                !currentUserMessage.current ||
+                currentUserMessage.current?.id != id
               ) {
                 // create assistant message and save to session
-                const { text, transcript } = formatted || {};
-                currentUserMessage.current = createMessage({
-                  id,
-                  role,
-                  content: delta?.transcript,
-                });
+                currentUserMessage.current = createMessage({ id, role });
                 chatStore.updateCurrentSession((session) => {
                   session.messages = session.messages.concat([
                     currentUserMessage.current,
                   ]);
                 });
+              }
+              if (content) {
                 // 转换为wav文件保存 TODO 使用mp3格式会更节省空间
+                const userMessage = currentUserMessage.current;
                 const wavFile = new WavPacker().pack(sampleRate, {
                   bitsPerSample: 16,
                   channelCount: 1,
@@ -241,7 +259,10 @@ export function RealtimeChat({
                 // 这里将音频文件放到对象里面wavFile.url可以使用<audio>标签播放
                 item.formatted.file = wavFile;
                 uploadImageRemote(wavFile.blob).then((audio_url) => {
-                  currentUserMessage.current.audio_url = audio_url;
+                  // update message content
+                  userMessage.content = content;
+                  // update message audio_url
+                  userMessage.audio_url = audio_url;
                   chatStore.updateCurrentSession((session) => {
                     session.messages = session.messages.concat();
                   });
