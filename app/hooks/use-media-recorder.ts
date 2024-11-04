@@ -95,6 +95,5 @@ export const useInt16PCMAudioRecorder = ({ sampleRate = 24000 }) => {
     stop,
     pause,
     resume,
-    reset: stop,
   };
 };

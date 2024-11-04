@@ -78,18 +78,10 @@ export function RealtimeChat({
   const clientRef = useRef<RealtimeClient | null>(null);
   const currentItemId = useRef<string>("");
   const accessStore = useAccessStore.getState();
-  const {
-    isRecording,
-    isPaused,
-    audioData,
-    start,
-    stop,
-    pause,
-    resume,
-    reset,
-  } = useInt16PCMAudioRecorder({ sampleRate: 24000 });
+  const { isRecording, isPaused, audioData, start, stop, pause, resume } =
+    useInt16PCMAudioRecorder({ sampleRate: 24000 });
 
-  const { isPlaying, startPlaying, stopPlaying, addInt16PCM } =
+  const { isPlaying, startPlaying, stopPlaying, addInt16PCM, currentTime } =
     useInt16PCMAudioPlayer({ sampleRate: 24000 });
 
   useEffect(() => {
@@ -150,8 +142,8 @@ export function RealtimeChat({
         });
         client.on("conversation.interrupted", async () => {
           if (currentItemId.current) {
-            reset();
-            await client.cancelResponse(trackId, currentTime);
+            stopPlaying();
+            await client.cancelResponse(currentItemId.current, currentTime());
           }
         });
         client.on("response.audio.delta", async (event: any) => {
@@ -163,7 +155,7 @@ export function RealtimeChat({
           if (delta?.audio) {
             if (currentItemId.current !== item.id) {
               currentItemId.current = item.id;
-              reset();
+              stopPlaying();
             }
             // typeof delta.audio is Int16Array
             console.log("delta.audio", delta.audio, item, event);

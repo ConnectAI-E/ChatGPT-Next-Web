@@ -96,5 +96,7 @@ export const useInt16PCMAudioPlayer = ({ sampleRate = 24000 }) => {
     startPlaying,
     stopPlaying,
     addInt16PCM,
+    currentTime: () => offset.current / sampleRate,
+    duration: () => bufferRef.current.length / sampleRate,
   };
 };
