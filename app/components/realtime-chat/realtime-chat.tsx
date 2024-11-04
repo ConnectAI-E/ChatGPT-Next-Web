@@ -5,10 +5,7 @@ import Close24Icon from "@/app/icons/close-24.svg";
 import styles from "./realtime-chat.module.scss";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  useStreamAudioPlayer,
-  useInt16PCMAudioPlayer,
-} from "@/app/hooks/use-stream-player";
+import { useInt16PCMAudioPlayer } from "@/app/hooks/use-stream-player";
 import { useInt16PCMAudioRecorder } from "@/app/hooks/use-media-recorder";
 import { RealtimeClient } from "openai-realtime-api";
 import { useAccessStore } from "@/app/store/access";
@@ -81,44 +78,19 @@ export function RealtimeChat({
   const clientRef = useRef<RealtimeClient | null>(null);
   const currentItemId = useRef<string>("");
   const accessStore = useAccessStore.getState();
-
-  const div = document.createElement("div");
-  document.body.appendChild(div);
-
   const {
-    add,
+    isRecording,
+    isPaused,
+    audioData,
+    start,
+    stop,
+    pause,
+    resume,
     reset,
-    stop: stopPlayer,
-    currentTime,
-  } = useStreamAudioPlayer({ sampleRate: 24000 });
-
-  // const { error, start, isPaused, stop, pause, resume } = useMediaRecorder({
-  //   onRecord(blob) {
-  //     console.log("onRecord", blob);
-  //     const url = URL.createObjectURL(blob)
-  //     const audio = document.createElement('audio')
-  //     audio.controls = true
-  //     audio.src = url
-  //     div.appendChild(audio);
-  //       blob.arrayBuffer().then((audio) => {
-  //         add(audio)
-  //         // clientRef.current?.appendInputAudio(audio);
-  //       });
-  //     if (clientRef.current?.getTurnDetectionType() === "server_vad") {
-  //       blob.arrayBuffer().then((audio) => {
-  //         add(audio)
-  //         // clientRef.current?.appendInputAudio(audio);
-  //       });
-  //     }
-  //   },
-  // });
-
-  // 这个是claude3.5写的一个录音，每次拿到8192的录音数据，并转换成16PCM的数组
-  const { isRecording, isPaused, audioData, start, stop, pause, resume } =
-    useInt16PCMAudioRecorder();
+  } = useInt16PCMAudioRecorder({ sampleRate: 24000 });
 
   const { isPlaying, startPlaying, stopPlaying, addInt16PCM } =
-    useInt16PCMAudioPlayer();
+    useInt16PCMAudioPlayer({ sampleRate: 24000 });
 
   useEffect(() => {
     console.log(
@@ -130,42 +102,14 @@ export function RealtimeChat({
       clientRef.current?.getTurnDetectionType() === "server_vad" &&
       audioData
     ) {
-      // add(audioData)
       console.log("appendInputAudio", audioData);
       // 将录制的16PCM音频发送给openai
       clientRef.current?.appendInputAudio(audioData);
     }
-    // if (audioData) {
-    //   // 直接将录音文件接入播放器，声音很奇怪!!!
-    //   const float32Array = new Float32Array(audioData.length);
-    //   for (let i = 0; i < audioData.length; i++) {
-    //     float32Array[i] = audioData[i] / 0x8000;
-    //   }
-    //   const audio = {
-    //     bitsPerSample: 16,
-    //     channels: [float32Array],
-    //     data: audioData,
-    //   };
-    //   const packer = new WavPacker();
-    //   const fromSampleRate = 24000;
-    //   const wavFile = packer.pack(fromSampleRate, audio);
-    //   console.log("packer.pack", wavFile);
-    //   wavFile.blob.arrayBuffer().then((buffer) => {
-    //     add(buffer);
-    //   });
-    // }
   }, [audioData]);
 
   useEffect(() => {
-    // 这里直接下载一个mp3文件，拿到的arrayBuffer可以使用AudioContext.decodeAudioData解码，但是openai返回的数据，不管是base64转换之后，还是使用sdk里面拿到的Int16Array都报错：“EncodingError”
-    // 现在使用openai那边的那个WavPacker尝试转换成能解析的文件buffer，
-    // 后面考虑是不是传16BitPCM直接构造出AudioBuffer，添加到StreamPlayer.bufferRef后面，应该速度更快
-    // fetch('https://mdn.github.io/webaudio-examples/decode-audio-data/callback/viper.mp3').then(res => res.arrayBuffer()).then(buffer => {
-    //   console.log('buffer', buffer)
-    //   add(buffer)
-    // })
-    // const apiKey = accessStore.openaiApiKey;
-    // const apiKey = ''
+    const apiKey = accessStore.openaiApiKey;
     if (apiKey) {
       const client = (clientRef.current = new RealtimeClient({
         url: "wss://api.openai.com/v1/realtime",
@@ -223,7 +167,7 @@ export function RealtimeChat({
             }
             // typeof delta.audio is Int16Array
             console.log("delta.audio", delta.audio, item, event);
-            // addInt16PCM(delta.audio)
+            addInt16PCM(delta.audio);
             // add(delta.audio.buffer)
             // 使用旧的依赖 decodeAudioData解码的方式，需要添加头信息才能解码成功
             // 计划使用新的方式直接生成AudioBuffer应该效率更高
@@ -240,9 +184,9 @@ export function RealtimeChat({
             const fromSampleRate = 24000;
             const wavFile = packer.pack(fromSampleRate, audio);
             console.log("packer.pack", wavFile);
-            wavFile.blob.arrayBuffer().then((buffer) => {
-              add(buffer);
-            });
+            // wavFile.blob.arrayBuffer().then((buffer) => {
+            //   add(buffer);
+            // });
             // 这里将音频文件放到对象里面wavFile.url可以使用<audio>标签播放
             item.formatted.file = wavFile;
           }
