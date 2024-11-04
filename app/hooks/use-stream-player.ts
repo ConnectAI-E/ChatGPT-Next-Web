@@ -59,8 +59,9 @@ export const useInt16PCMAudioPlayer = ({ sampleRate = 24000 }) => {
   const stopPlaying = useCallback(() => {
     if (isPlaying) {
       setIsPlaying(false);
-      bufferRef.current = [];
     }
+    bufferRef.current = [];
+    offset.current = 0;
   }, [isPlaying]);
 
   const addInt16PCM = useCallback(
