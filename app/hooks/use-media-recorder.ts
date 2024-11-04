@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 
 export const useMediaRecorder = (options: {
   onRecord?: (blob: Blob) => void;
@@ -96,6 +96,101 @@ export const useMediaRecorder = (options: {
     isPaused: () => mediaRecorder.current?.state === "paused",
     isRecording: () =>
       mediaRecorder.current && mediaRecorder.current?.state !== "inactive",
+    start,
+    stop,
+    pause,
+    resume,
+  };
+};
+
+export const useInt16PCMAudioRecorder = () => {
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [audioData, setAudioData] = useState(null);
+  const audioContextRef = useRef(null);
+  const sourceRef = useRef(null);
+  const processorRef = useRef(null);
+
+  const start = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext ||
+        window.webkitAudioContext)();
+    }
+
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        sourceRef.current =
+          audioContextRef.current.createMediaStreamSource(stream);
+        processorRef.current = audioContextRef.current.createScriptProcessor(
+          8192,
+          1,
+          1,
+        );
+
+        processorRef.current.onaudioprocess = (e) => {
+          if (!isPaused) {
+            const inputData = e.inputBuffer.getChannelData(0);
+            const pcmData = convertToInt16PCM(inputData);
+            setAudioData(pcmData);
+          }
+        };
+
+        sourceRef.current.connect(processorRef.current);
+        processorRef.current.connect(audioContextRef.current.destination);
+
+        setIsRecording(true);
+        setIsPaused(false);
+      })
+      .catch((error) => console.error("Error accessing microphone:", error));
+  }, [isPaused]);
+
+  const stop = useCallback(() => {
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setIsRecording(false);
+    setIsPaused(false);
+  }, []);
+
+  const pause = useCallback(() => {
+    setIsPaused(true);
+  }, []);
+
+  const resume = useCallback(() => {
+    setIsPaused(false);
+  }, []);
+
+  const convertToInt16PCM = (floatData) => {
+    const pcmData = new Int16Array(floatData.length);
+    for (let i = 0; i < floatData.length; i++) {
+      const s = Math.max(-1, Math.min(1, floatData[i]));
+      pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return pcmData;
+  };
+
+  useEffect(() => {
+    return () => {
+      if (isRecording) {
+        stop();
+      }
+    };
+  }, [isRecording, stop]);
+
+  return {
+    isRecording,
+    isPaused,
+    audioData,
     start,
     stop,
     pause,
