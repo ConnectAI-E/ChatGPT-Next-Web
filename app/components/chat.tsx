@@ -1327,6 +1327,8 @@ function _Chat() {
     return renderMessages.slice(msgRenderIndex, endRenderIndex);
   }, [msgRenderIndex, renderMessages]);
 
+  console.log("messages", messages);
+
   const onChatBodyScroll = (e: HTMLElement) => {
     const bottomHeight = e.scrollTop + e.clientHeight;
     const edgeThreshold = e.clientHeight;
@@ -1912,6 +1914,11 @@ function _Chat() {
                             </div>
                           )}
                         </div>
+                        {message?.audio_url && (
+                          <div className={styles["chat-message-audio"]}>
+                            <audio src={message.audio_url} controls />
+                          </div>
+                        )}
 
                         <div className={styles["chat-message-action-date"]}>
                           {isContext

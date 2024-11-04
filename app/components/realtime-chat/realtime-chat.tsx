@@ -8,12 +8,19 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useInt16PCMAudioPlayer } from "@/app/hooks/use-stream-player";
 import { useInt16PCMAudioRecorder } from "@/app/hooks/use-media-recorder";
 import { RealtimeClient } from "openai-realtime-api";
-import { useAccessStore } from "@/app/store/access";
+import {
+  useAccessStore,
+  useChatStore,
+  ChatMessage,
+  createMessage,
+} from "@/app/store";
+import { uploadImage as uploadImageRemote } from "@/app/utils/chat";
 
 interface RealtimeChatProps {
   onClose?: () => void;
   onStartVoice?: () => void;
   onPausedVoice?: () => void;
+  sampleRate: number;
 }
 
 export class WavPacker {
@@ -26,12 +33,10 @@ export class WavPacker {
   pack(sampleRate, audio) {
     if (!audio?.bitsPerSample) {
       throw new Error(`Missing "bitsPerSample"`);
-    } else if (!audio?.channels) {
-      throw new Error(`Missing "channels"`);
     } else if (!audio?.data) {
       throw new Error(`Missing "data"`);
     }
-    const { bitsPerSample, channels, data } = audio;
+    const { bitsPerSample, channelCount, data } = audio;
     const output = [
       // Header
       "RIFF",
@@ -44,17 +49,14 @@ export class WavPacker {
       "fmt ", // Sub-chunk identifier
       this._packData(1, 16), // Chunk length
       this._packData(0, 1), // Audio format (1 is linear quantization)
-      this._packData(0, channels.length),
+      this._packData(0, channelCount),
       this._packData(1, sampleRate),
-      this._packData(1, (sampleRate * channels.length * bitsPerSample) / 8), // Byte rate
-      this._packData(0, (channels.length * bitsPerSample) / 8),
+      this._packData(1, (sampleRate * channelCount * bitsPerSample) / 8), // Byte rate
+      this._packData(0, (channelCount * bitsPerSample) / 8),
       this._packData(0, bitsPerSample),
       // chunk 2
       "data", // Sub-chunk identifier
-      this._packData(
-        1,
-        (channels[0].length * channels.length * bitsPerSample) / 8,
-      ), // Chunk length
+      this._packData(1, (data.length * channelCount * bitsPerSample) / 8), // Chunk length
       data,
     ];
     const blob = new Blob(output, { type: "audio/mpeg" });
@@ -62,9 +64,9 @@ export class WavPacker {
     return {
       blob,
       url,
-      channelCount: channels.length,
+      channelCount,
       sampleRate,
-      duration: data.byteLength / (channels.length * sampleRate * 2),
+      duration: data.byteLength / (channelCount * sampleRate * 2),
     };
   }
 }
@@ -73,131 +75,197 @@ export function RealtimeChat({
   onClose,
   onStartVoice,
   onPausedVoice,
+  sampleRate = 24000,
 }: RealtimeChatProps) {
   const [isVoicePaused, setIsVoicePaused] = useState(true);
   const clientRef = useRef<RealtimeClient | null>(null);
   const currentItemId = useRef<string>("");
+  const currentBotMessage = useRef<ChatMessage | null>();
+  const currentUserMessage = useRef<ChatMessage | null>();
   const accessStore = useAccessStore.getState();
+  const chatStore = useChatStore();
   const { isRecording, isPaused, audioData, start, stop, pause, resume } =
-    useInt16PCMAudioRecorder({ sampleRate: 24000 });
+    useInt16PCMAudioRecorder({ sampleRate });
 
   const { isPlaying, startPlaying, stopPlaying, addInt16PCM, currentTime } =
-    useInt16PCMAudioPlayer({ sampleRate: 24000 });
+    useInt16PCMAudioPlayer({ sampleRate });
 
   useEffect(() => {
-    console.log(
-      "appendInputAudio",
-      audioData,
-      clientRef.current?.getTurnDetectionType(),
-    );
     if (
       clientRef.current?.getTurnDetectionType() === "server_vad" &&
       audioData
     ) {
-      console.log("appendInputAudio", audioData);
+      // console.log("appendInputAudio", audioData);
       // 将录制的16PCM音频发送给openai
       clientRef.current?.appendInputAudio(audioData);
     }
   }, [audioData]);
 
   useEffect(() => {
-    const apiKey = accessStore.openaiApiKey;
-    if (apiKey) {
+    console.log("isRecording", isRecording);
+    if (!isRecording.current) return;
+    if (!clientRef.current) {
+      const apiKey = accessStore.openaiApiKey;
       const client = (clientRef.current = new RealtimeClient({
         url: "wss://api.openai.com/v1/realtime",
         apiKey,
         dangerouslyAllowAPIKeyInBrowser: true,
         debug: true,
       }));
-      client.connect().then(() => {
-        // TODO 设置真实的上下文
-        client.sendUserMessageContent([
-          {
-            type: `input_text`,
-            text: `Hello`,
-            // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
-          },
-        ]);
+      client
+        .connect()
+        .then(() => {
+          // TODO 设置真实的上下文
+          client.sendUserMessageContent([
+            {
+              type: `input_text`,
+              text: `Hi`,
+              // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+            },
+          ]);
 
-        // 配置服务端判断说话人开启还是结束
-        client.updateSession({
-          turn_detection: { type: "server_vad" },
-        });
+          // 配置服务端判断说话人开启还是结束
+          client.updateSession({
+            turn_detection: { type: "server_vad" },
+          });
 
-        client.on("realtime.event", (realtimeEvent: CustomRealtimeEvent) => {
-          // 调试，可以在
-          console.log("realtime.event", realtimeEvent);
-        });
+          client.on("realtime.event", (realtimeEvent: CustomRealtimeEvent) => {
+            // 调试
+            console.log("realtime.event", realtimeEvent);
+          });
 
-        client.on("response.audio_transcript.delta", async (e) => {
-          // 小段文本，可以拼接
-          console.log("response.audio_transcript.delta", e.delta);
-        });
-        client.on("response.done", async (e) => {
-          // 整个文本
-          console.log(
-            "response.done",
-            e.response.output?.[0]?.content?.[0]?.transcript,
-          );
-        });
-        client.on("conversation.interrupted", async () => {
-          if (currentItemId.current) {
-            stopPlaying();
-            await client.cancelResponse(currentItemId.current, currentTime());
-          }
-        });
-        client.on("response.audio.delta", async (event: any) => {
-          console.log("response.audio.delta", event);
-        });
-        client.on("conversation.updated", async (event: any) => {
-          const { item, delta } = event;
-          const items = client.conversation.getItems();
-          if (delta?.audio) {
-            if (currentItemId.current !== item.id) {
-              currentItemId.current = item.id;
+          client.on("conversation.interrupted", async () => {
+            if (currentBotMessage.current) {
               stopPlaying();
+              try {
+                client.cancelResponse(
+                  currentBotMessage.current?.id,
+                  currentTime(),
+                );
+              } catch (e) {
+                console.error(e);
+              }
             }
-            // typeof delta.audio is Int16Array
-            console.log("delta.audio", delta.audio, item, event);
-            addInt16PCM(delta.audio);
-            // add(delta.audio.buffer)
-            // 使用旧的依赖 decodeAudioData解码的方式，需要添加头信息才能解码成功
-            // 计划使用新的方式直接生成AudioBuffer应该效率更高
-            const float32Array = new Float32Array(delta.audio.length);
-            for (let i = 0; i < delta.audio.length; i++) {
-              float32Array[i] = delta.audio[i] / 0x8000;
+          });
+          client.on("conversation.updated", async (event: any) => {
+            console.log("currentSession", chatStore.currentSession());
+            const items = client.conversation.getItems();
+            console.log(
+              "conversation.updated",
+              event,
+              event?.item?.content?.[0]?.transcript,
+              event.item?.status,
+              items,
+            );
+            const { item, delta } = event;
+            const { role, id, status, formatted } = item || {};
+            if (id && role == "assistant") {
+              if (
+                !currentBotMessage.current ||
+                currentBotMessage.current?.id != id
+              ) {
+                // create assistant message and save to session
+                currentBotMessage.current = createMessage({ id, role });
+                chatStore.updateCurrentSession((session) => {
+                  session.messages = session.messages.concat([
+                    currentBotMessage.current,
+                  ]);
+                });
+              }
+              if (currentBotMessage.current?.id != id) {
+                stopPlaying();
+              }
+              if (delta?.transcript) {
+                const { text, transcript } = formatted || {};
+                currentBotMessage.current.content = transcript;
+                chatStore.updateCurrentSession((session) => {
+                  session.messages = session.messages.concat();
+                });
+              }
+              if (delta?.audio) {
+                // typeof delta.audio is Int16Array
+                // 直接播放
+                addInt16PCM(delta.audio);
+              }
+              console.log(
+                "updated try save wavFile",
+                status,
+                currentBotMessage.current?.audio_url,
+                formatted?.audio,
+              );
+              if (
+                status == "completed" &&
+                !currentBotMessage.current?.audio_url &&
+                formatted?.audio
+              ) {
+                // 转换为wav文件保存 TODO 使用mp3格式会更节省空间
+                const wavFile = new WavPacker().pack(sampleRate, {
+                  bitsPerSample: 16,
+                  channelCount: 1,
+                  data: formatted?.audio,
+                });
+                // 这里将音频文件放到对象里面wavFile.url可以使用<audio>标签播放
+                item.formatted.file = wavFile;
+                uploadImageRemote(wavFile.blob).then((audio_url) => {
+                  currentBotMessage.current.audio_url = audio_url;
+                  chatStore.updateCurrentSession((session) => {
+                    session.messages = session.messages.concat();
+                  });
+                });
+              }
             }
-            const audio = {
-              bitsPerSample: 16,
-              channels: [float32Array],
-              data: delta.audio,
-            };
-            const packer = new WavPacker();
-            const fromSampleRate = 24000;
-            const wavFile = packer.pack(fromSampleRate, audio);
-            console.log("packer.pack", wavFile);
-            // wavFile.blob.arrayBuffer().then((buffer) => {
-            //   add(buffer);
-            // });
-            // 这里将音频文件放到对象里面wavFile.url可以使用<audio>标签播放
-            item.formatted.file = wavFile;
-          }
-          // setItems(items);
+            if (id && role == "user") {
+              if (
+                delta?.transcript &&
+                (!currentUserMessage.current ||
+                  currentUserMessage.current?.id != id)
+              ) {
+                // create assistant message and save to session
+                const { text, transcript } = formatted || {};
+                currentUserMessage.current = createMessage({
+                  id,
+                  role,
+                  content: delta?.transcript,
+                });
+                chatStore.updateCurrentSession((session) => {
+                  session.messages = session.messages.concat([
+                    currentUserMessage.current,
+                  ]);
+                });
+                // 转换为wav文件保存 TODO 使用mp3格式会更节省空间
+                const wavFile = new WavPacker().pack(sampleRate, {
+                  bitsPerSample: 16,
+                  channelCount: 1,
+                  data: formatted?.audio,
+                });
+                // 这里将音频文件放到对象里面wavFile.url可以使用<audio>标签播放
+                item.formatted.file = wavFile;
+                uploadImageRemote(wavFile.blob).then((audio_url) => {
+                  currentUserMessage.current.audio_url = audio_url;
+                  chatStore.updateCurrentSession((session) => {
+                    session.messages = session.messages.concat();
+                  });
+                });
+              }
+            }
+          });
+        })
+        .catch((e) => {
+          console.error("Error", e);
         });
-      });
     }
     return () => {
       stop();
       // TODO close client
       clientRef.current?.disconnect();
     };
-  }, []);
+  }, [isRecording.current]);
 
   const handleStartVoice = useCallback(() => {
     onStartVoice?.();
     setIsVoicePaused(false);
-    isPaused ? resume() : start();
-  }, [isPaused]);
+    isPaused.current ? resume() : start();
+  }, [isPaused.current]);
 
   const handlePausedVoice = () => {
     onPausedVoice?.();
