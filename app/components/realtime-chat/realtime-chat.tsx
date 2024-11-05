@@ -1,8 +1,8 @@
 import VoiceIcon from "@/app/icons/voice.svg";
 import VoiceOffIcon from "@/app/icons/voice-off.svg";
-
 import Close24Icon from "@/app/icons/close-24.svg";
 import styles from "./realtime-chat.module.scss";
+import clsx from "clsx";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useInt16PCMAudioPlayer } from "@/app/hooks/use-stream-player";
@@ -310,7 +310,11 @@ export function RealtimeChat({
 
   return (
     <div className={styles["realtime-chat"]}>
-      <div className={styles["circle-mic"]}>
+      <div
+        className={clsx(styles["circle-mic"], {
+          [styles["pulse"]]: isRecording && !isPaused,
+        })}
+      >
         <div className={styles["icon-center"]}></div>
       </div>
       <div className={styles["bottom-icons"]}>

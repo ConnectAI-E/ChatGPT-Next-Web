@@ -124,6 +124,8 @@ import { isEmpty } from "lodash-es";
 
 import { RealtimeChat } from "@/app/components/realtime-chat";
 
+import clsx from "clsx";
+
 const localStorage = safeLocalStorage();
 
 const ttsPlayer = createTTSPlayer();
@@ -2018,22 +2020,21 @@ function _Chat() {
               </label>
             </div>
           </div>
-          {showChatSidePanel && (
-            <div
-              className={`${styles["chat-side-panel"]} ${
-                isMobileScreen ? styles["mobile"] : ""
-              } ${styles["chat-side-panel-show"]}`}
-            >
-              <RealtimeChat
-                onClose={() => {
-                  setShowChatSidePanel(false);
-                }}
-                onStartVoice={async () => {
-                  console.log("start voice");
-                }}
-              />
-            </div>
-          )}
+          <div
+            className={clsx(styles["chat-side-panel"], {
+              [styles["mobile"]]: isMobileScreen,
+              [styles["chat-side-panel-show"]]: showChatSidePanel,
+            })}
+          >
+            <RealtimeChat
+              onClose={() => {
+                setShowChatSidePanel(false);
+              }}
+              onStartVoice={async () => {
+                console.log("start voice");
+              }}
+            />
+          </div>
         </div>
       </div>
       {showExport && (
