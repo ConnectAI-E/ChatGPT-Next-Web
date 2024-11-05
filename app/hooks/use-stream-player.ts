@@ -2,16 +2,16 @@ import { useCallback, useRef, useEffect, useState } from "react";
 
 export const useInt16PCMAudioPlayer = ({ sampleRate = 24000 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioContextRef = useRef(null);
-  const processorRef = useRef(null);
-  const bufferRef = useRef([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const bufferRef = useRef<number[]>([]);
   const offset = useRef(0);
 
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext({ sampleRate });
 
-      processorRef.current = audioContextRef.current.createScriptProcessor(
+      processorRef.current = audioContextRef.current!.createScriptProcessor(
         8192,
         1,
         1,
@@ -47,7 +47,7 @@ export const useInt16PCMAudioPlayer = ({ sampleRate = 24000 }) => {
       initAudioContext();
       // 确保 AudioContext 已启动
       Promise.resolve(
-        audioContextRef.current.state === "suspended"
+        audioContextRef.current?.state === "suspended"
           ? audioContextRef.current.resume()
           : true,
       ).then(() => {
@@ -65,11 +65,12 @@ export const useInt16PCMAudioPlayer = ({ sampleRate = 24000 }) => {
   }, [isPlaying]);
 
   const addInt16PCM = useCallback(
-    (int16PCMData) => {
+    (int16PCMData: Int16Array) => {
       // append to bufferRef
       if (int16PCMData) {
         bufferRef.current.push.apply(
           bufferRef.current,
+          // @ts-ignore
           new Int16Array(int16PCMData),
         );
         if (!isPlaying) {

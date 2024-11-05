@@ -3,10 +3,10 @@ import { useCallback, useState, useRef, useEffect } from "react";
 export const useInt16PCMAudioRecorder = ({ sampleRate = 24000 }) => {
   const isRecording = useRef(false);
   const isPaused = useRef(false);
-  const [audioData, setAudioData] = useState(null);
-  const audioContextRef = useRef(null);
-  const sourceRef = useRef(null);
-  const processorRef = useRef(null);
+  const [audioData, setAudioData] = useState<Int16Array | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
 
   const start = useCallback(() => {
     if (!audioContextRef.current) {
@@ -17,8 +17,8 @@ export const useInt16PCMAudioRecorder = ({ sampleRate = 24000 }) => {
       .getUserMedia({ audio: true })
       .then((stream) => {
         sourceRef.current =
-          audioContextRef.current.createMediaStreamSource(stream);
-        processorRef.current = audioContextRef.current.createScriptProcessor(
+          audioContextRef.current!.createMediaStreamSource(stream);
+        processorRef.current = audioContextRef.current!.createScriptProcessor(
           8192,
           1,
           1,
@@ -34,12 +34,12 @@ export const useInt16PCMAudioRecorder = ({ sampleRate = 24000 }) => {
         };
 
         sourceRef.current.connect(processorRef.current);
-        processorRef.current.connect(audioContextRef.current.destination);
+        processorRef.current.connect(audioContextRef.current!.destination);
         isRecording.current = true;
         isPaused.current = false;
       })
       .catch((error) => console.error("Error accessing microphone:", error));
-  }, []);
+  }, [sampleRate]);
 
   const stop = useCallback(() => {
     if (processorRef.current) {
@@ -70,7 +70,7 @@ export const useInt16PCMAudioRecorder = ({ sampleRate = 24000 }) => {
     // setIsPaused(false);
   }, []);
 
-  const convertToInt16PCM = (floatData) => {
+  const convertToInt16PCM = (floatData: Float32Array) => {
     const pcmData = new Int16Array(floatData.length);
     for (let i = 0; i < floatData.length; i++) {
       const s = Math.max(-1, Math.min(1, floatData[i]));

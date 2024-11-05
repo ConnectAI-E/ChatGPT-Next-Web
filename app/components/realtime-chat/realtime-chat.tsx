@@ -20,17 +20,31 @@ interface RealtimeChatProps {
   onClose?: () => void;
   onStartVoice?: () => void;
   onPausedVoice?: () => void;
+  sampleRate?: number;
+}
+
+interface AudioData {
+  bitsPerSample: number;
+  channelCount: number;
+  data: Int16Array;
+}
+
+interface PackedAudio {
+  blob: Blob;
+  url: string;
+  channelCount: number;
   sampleRate: number;
+  duration: number;
 }
 
 export class WavPacker {
-  _packData(size, arg) {
+  _packData(size: 0 | 1, arg: number): Uint8Array {
     return [
       new Uint8Array([arg, arg >> 8]),
       new Uint8Array([arg, arg >> 8, arg >> 16, arg >> 24]),
     ][size];
   }
-  pack(sampleRate, audio) {
+  pack(sampleRate: number, audio: AudioData): PackedAudio {
     if (!audio?.bitsPerSample) {
       throw new Error(`Missing "bitsPerSample"`);
     } else if (!audio?.data) {
@@ -129,7 +143,7 @@ export function RealtimeChat({
             turn_detection: { type: "server_vad" },
           });
 
-          client.on("realtime.event", (realtimeEvent: CustomRealtimeEvent) => {
+          client.on("realtime.event", (realtimeEvent) => {
             // 调试
             console.log("realtime.event", realtimeEvent);
           });
@@ -179,7 +193,7 @@ export function RealtimeChat({
                 currentBotMessage.current = createMessage({ id, role });
                 chatStore.updateCurrentSession((session) => {
                   session.messages = session.messages.concat([
-                    currentBotMessage.current,
+                    currentBotMessage.current!,
                   ]);
                 });
               }
@@ -244,7 +258,7 @@ export function RealtimeChat({
                 currentUserMessage.current = createMessage({ id, role });
                 chatStore.updateCurrentSession((session) => {
                   session.messages = session.messages.concat([
-                    currentUserMessage.current,
+                    currentUserMessage.current!,
                   ]);
                 });
               }

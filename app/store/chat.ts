@@ -51,8 +51,6 @@ export type ChatMessage = RequestMessage & {
   isError?: boolean;
   id: string;
   model?: ModelType;
-  role?: string;
-  content?: string;
   audio_url?: string;
   tools?: ChatMessageTool[];
 };
